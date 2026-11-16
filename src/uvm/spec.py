@@ -40,3 +40,14 @@ COMMANDS = {
         4, (Field("B", 5, 20), Field("C", 21, 36), Field("D", 37, 52))
     ),
 }
+
+BY_OPCODE = {command.opcode: command for command in COMMANDS.values()}
+
+
+def encode(fields: dict[str, int]) -> bytes:
+    """Собирает команду из полей в 7 байт, младший байт первым."""
+    command = BY_OPCODE[fields["A"]]
+    value = fields["A"]
+    for field in command.fields:
+        value |= fields[field.name] << field.first
+    return value.to_bytes(COMMAND_SIZE, "little")

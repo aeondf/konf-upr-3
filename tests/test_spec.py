@@ -1,10 +1,13 @@
 """Тесты спецификации команд УВМ."""
 
-from uvm.spec import COMMANDS, OPCODE, Field
+import pytest
+
+from uvm.spec import COMMAND_SIZE, COMMANDS, OPCODE, Field, encode
 
 ADDRESS_LIMIT = 65535
 CONSTANT_LIMIT = 4194303
 OPCODE_LIMIT = 31
+LAST_BYTE_OF_D = 0x1F
 
 
 def test_field_limit() -> None:
@@ -35,3 +38,36 @@ def test_fields_do_not_overlap() -> None:
         for field in command.fields:
             assert field.first == previous.last + 1
             previous = field
+
+
+@pytest.mark.parametrize(
+    ("fields", "code"),
+    [
+        (
+            {"A": 0, "B": 327, "C": 452},
+            [0xE0, 0x28, 0x80, 0x38, 0x00, 0x00, 0x00],
+        ),
+        (
+            {"A": 26, "B": 786, "C": 303},
+            [0x5A, 0x62, 0xE0, 0x25, 0x00, 0x00, 0x00],
+        ),
+        (
+            {"A": 10, "B": 124, "C": 13},
+            [0x8A, 0x0F, 0xA0, 0x01, 0x00, 0x00, 0x00],
+        ),
+        (
+            {"A": 4, "B": 371, "C": 880, "D": 359},
+            [0x64, 0x2E, 0x00, 0x6E, 0xE0, 0x2C, 0x00],
+        ),
+    ],
+)
+def test_encode_spec_tests(fields: dict[str, int], code: list[int]) -> None:
+    """Байты совпадают с тестами из спецификации."""
+    assert encode(fields) == bytes(code)
+
+
+def test_encode_max_values() -> None:
+    """Наибольшие значения полей не вылезают за 7 байт."""
+    code = encode({"A": 4, "B": 65535, "C": 65535, "D": 65535})
+    assert len(code) == COMMAND_SIZE
+    assert code[-1] == LAST_BYTE_OF_D

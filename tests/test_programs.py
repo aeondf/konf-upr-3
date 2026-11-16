@@ -22,3 +22,9 @@ def test_copy() -> None:
     memory = run_program("copy.csv")
     assert memory[1100:1105] == [10, 20, 30, 40, 50]
     assert memory[1200:1205] == [10, 20, 30, 40, 50]
+
+
+def test_div() -> None:
+    """Частные целые, остаток отбрасывается."""
+    memory = run_program("div.csv")
+    assert memory[1200:1205] == [14, 9, 0, 1398101, 42]

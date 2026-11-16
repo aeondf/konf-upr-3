@@ -2,7 +2,15 @@
 
 import pytest
 
-from uvm.spec import COMMAND_SIZE, COMMANDS, OPCODE, Field, encode
+from uvm.spec import (
+    COMMAND_SIZE,
+    COMMANDS,
+    OPCODE,
+    Field,
+    UvmError,
+    decode,
+    encode,
+)
 
 ADDRESS_LIMIT = 65535
 CONSTANT_LIMIT = 4194303
@@ -71,3 +79,24 @@ def test_encode_max_values() -> None:
     code = encode({"A": 4, "B": 65535, "C": 65535, "D": 65535})
     assert len(code) == COMMAND_SIZE
     assert code[-1] == LAST_BYTE_OF_D
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"A": 0, "B": 327, "C": 452},
+        {"A": 26, "B": 786, "C": 303},
+        {"A": 10, "B": 124, "C": 13},
+        {"A": 4, "B": 371, "C": 880, "D": 359},
+        {"A": 0, "B": 65535, "C": 4194303},
+    ],
+)
+def test_decode_is_reverse_of_encode(fields: dict[str, int]) -> None:
+    """После перевода в байты и обратно получаются те же поля."""
+    assert decode(encode(fields)) == fields
+
+
+def test_decode_unknown_opcode() -> None:
+    """Неизвестный код операции — ошибка."""
+    with pytest.raises(UvmError, match="unknown command code A=1"):
+        decode(bytes([1, 0, 0, 0, 0, 0, 0]))

@@ -51,3 +51,16 @@ def encode(fields: dict[str, int]) -> bytes:
     for field in command.fields:
         value |= fields[field.name] << field.first
     return value.to_bytes(COMMAND_SIZE, "little")
+
+
+def decode(code: bytes) -> dict[str, int]:
+    """Разбирает 7 байт машинного кода обратно на поля."""
+    value = int.from_bytes(code, "little")
+    opcode = value & OPCODE.limit()
+    command = BY_OPCODE.get(opcode)
+    if command is None:
+        raise UvmError(f"unknown command code A={opcode}")
+    fields = {"A": opcode}
+    for field in command.fields:
+        fields[field.name] = (value >> field.first) & field.limit()
+    return fields

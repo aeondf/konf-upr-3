@@ -1,10 +1,10 @@
-"""Ассемблер УВМ: текст программы в формате CSV → команды."""
+"""Ассемблер УВМ: текст программы в формате CSV → машинный код."""
 
 import argparse
 import csv
 from pathlib import Path
 
-from uvm.spec import COMMANDS, Field, UvmError
+from uvm.spec import COMMANDS, Field, UvmError, encode
 
 Fields = dict[str, int]
 
@@ -68,9 +68,18 @@ def read_program(path: str) -> list[Fields]:
     return parse_program(text, path)
 
 
-def format_fields(fields: Fields) -> str:
-    """Записывает команду как в спецификации: «A=0, B=327, C=452»."""
-    return ", ".join(f"{name}={value}" for name, value in fields.items())
+def write_binary(path: str, code: bytes) -> int:
+    """Записывает машинный код в файл и возвращает размер файла."""
+    try:
+        Path(path).write_bytes(code)
+    except OSError as error:
+        raise UvmError(f"cannot write {path!r}: {error.strerror}") from None
+    return Path(path).stat().st_size
+
+
+def format_bytes(code: bytes) -> str:
+    """Записывает байты как в спецификации: «0xE0, 0x28, ...»."""
+    return ", ".join(f"0x{byte:02X}" for byte in code)
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -93,13 +102,15 @@ def main() -> int:
     args = parse_arguments()
     try:
         program = read_program(args.input)
+        code = [encode(fields) for fields in program]
+        size = write_binary(args.output, b"".join(code))
     except UvmError as error:
         print(f"error: {error}")
         return 1
-    print(f"Commands: {len(program)}")
     if args.test:
-        for fields in program:
-            print(format_fields(fields))
+        for command in code:
+            print(format_bytes(command))
+    print(f"Size of {args.output}: {size} bytes")
     return 0
 
 

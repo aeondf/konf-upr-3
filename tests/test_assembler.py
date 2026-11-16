@@ -4,11 +4,17 @@ from pathlib import Path
 
 import pytest
 
-from uvm.assembler import format_fields, main, parse_program, read_program
+from uvm.assembler import format_bytes, main, parse_program, read_program
 from uvm.spec import UvmError
 
 SPEC = Path(__file__).parent.parent / "programs" / "spec.csv"
 ERROR_CODE = 1
+SPEC_BYTES = [
+    *(0xE0, 0x28, 0x80, 0x38, 0x00, 0x00, 0x00),
+    *(0x5A, 0x62, 0xE0, 0x25, 0x00, 0x00, 0x00),
+    *(0x8A, 0x0F, 0xA0, 0x01, 0x00, 0x00, 0x00),
+    *(0x64, 0x2E, 0x00, 0x6E, 0xE0, 0x2C, 0x00),
+]
 
 
 def run_main(monkeypatch: pytest.MonkeyPatch, *argv: str) -> int:
@@ -27,10 +33,9 @@ def test_spec_program() -> None:
     ]
 
 
-def test_format_fields() -> None:
-    """Команда записывается полями, как в спецификации."""
-    fields = {"A": 0, "B": 327, "C": 452}
-    assert format_fields(fields) == "A=0, B=327, C=452"
+def test_format_bytes() -> None:
+    """Байты записываются как в спецификации."""
+    assert format_bytes(bytes([0xE0, 0x28, 0x00])) == "0xE0, 0x28, 0x00"
 
 
 def test_comments_spaces_and_hex() -> None:
@@ -75,27 +80,35 @@ def test_missing_file() -> None:
         read_program("nope.csv")
 
 
-def test_main_test_mode(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+def test_main_writes_binary(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
-    """В режиме тестирования печатаются поля и значения команд."""
-    argv = ("--input", str(SPEC), "--output", "spec.bin", "--test")
+    """Машинный код записывается в файл, печатается его размер."""
+    output = tmp_path / "spec.bin"
+    argv = ("--input", str(SPEC), "--output", str(output))
+    assert run_main(monkeypatch, *argv) == 0
+    assert output.read_bytes() == bytes(SPEC_BYTES)
+    assert capsys.readouterr().out == f"Size of {output}: 28 bytes\n"
+
+
+def test_main_test_mode(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    """В режиме тестирования печатаются байты каждой команды."""
+    output = tmp_path / "spec.bin"
+    argv = ("--input", str(SPEC), "--output", str(output), "--test")
     assert run_main(monkeypatch, *argv) == 0
     assert capsys.readouterr().out == (
-        "Commands: 4\n"
-        "A=0, B=327, C=452\n"
-        "A=26, B=786, C=303\n"
-        "A=10, B=124, C=13\n"
-        "A=4, B=371, C=880, D=359\n"
+        "0xE0, 0x28, 0x80, 0x38, 0x00, 0x00, 0x00\n"
+        "0x5A, 0x62, 0xE0, 0x25, 0x00, 0x00, 0x00\n"
+        "0x8A, 0x0F, 0xA0, 0x01, 0x00, 0x00, 0x00\n"
+        "0x64, 0x2E, 0x00, 0x6E, 0xE0, 0x2C, 0x00\n"
+        f"Size of {output}: 28 bytes\n"
     )
-
-
-def test_main_without_test_mode(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Без режима тестирования поля не печатаются."""
-    run_main(monkeypatch, "--input", str(SPEC), "--output", "spec.bin")
-    assert capsys.readouterr().out == "Commands: 4\n"
 
 
 def test_main_error(
@@ -105,3 +118,12 @@ def test_main_error(
     code = run_main(monkeypatch, "--input", "nope.csv", "--output", "x.bin")
     assert code == ERROR_CODE
     assert capsys.readouterr().out == "error: file 'nope.csv' not found\n"
+
+
+def test_main_cannot_write(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Папки для результата нет — сообщение и код 1."""
+    argv = ("--input", str(SPEC), "--output", "nope/spec.bin")
+    assert run_main(monkeypatch, *argv) == ERROR_CODE
+    assert capsys.readouterr().out.startswith("error: cannot write 'nope/")

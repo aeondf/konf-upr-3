@@ -8,6 +8,7 @@ from uvm.spec import COMMAND_SIZE, UvmError, encode
 
 VALUE = 77
 TWO_COMMANDS = 2
+QUOTIENT = 14
 
 
 def assemble(text: str) -> bytes:
@@ -55,10 +56,18 @@ def test_write() -> None:
     assert machine.memory[1200] == VALUE
 
 
-def test_div_is_not_supported_yet() -> None:
-    """Деление появится на этапе 4."""
-    with pytest.raises(UvmError, match="A=4 is not supported yet"):
-        run("div,1000,1001,1002")
+def test_divide() -> None:
+    """div: память[D] = память[память[B]] / память[C], целая часть."""
+    machine = run(
+        "const,1000,1100\nconst,1100,100\nconst,1101,7\ndiv,1000,1101,1200"
+    )
+    assert machine.memory[1200] == QUOTIENT
+
+
+def test_divide_by_zero() -> None:
+    """Деление на ноль — ошибка."""
+    with pytest.raises(UvmError, match="division by zero: cell 1101 is 0"):
+        run("const,1000,1100\nconst,1100,5\ndiv,1000,1101,1200")
 
 
 def test_bad_program_size() -> None:

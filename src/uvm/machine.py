@@ -27,6 +27,7 @@ class Machine:
             COMMANDS["const"].opcode: self.load_const,
             COMMANDS["read"].opcode: self.read,
             COMMANDS["write"].opcode: self.write,
+            COMMANDS["div"].opcode: self.divide,
         }
 
     def run(self) -> int:
@@ -39,13 +40,7 @@ class Machine:
     def step(self, address: int) -> None:
         """Читает команду из памяти, переводит в поля и выполняет."""
         fields = decode(self.fetch(address))
-        handler = self.handlers.get(fields["A"])
-        if handler is None:
-            raise UvmError(
-                f"address {address}: command A={fields['A']} "
-                "is not supported yet"
-            )
-        handler(fields)
+        self.handlers[fields["A"]](fields)
 
     def fetch(self, address: int) -> bytes:
         """Берёт из памяти 7 байт команды."""
@@ -82,3 +77,10 @@ class Machine:
     def write(self, fields: Fields) -> None:
         """Команда write: память[память[C]] = память[B]."""
         self.set(self.get(fields["C"]), self.get(fields["B"]))
+
+    def divide(self, fields: Fields) -> None:
+        """Команда div: память[D] = память[память[B]] / память[C]."""
+        divisor = self.get(fields["C"])
+        if divisor == 0:
+            raise UvmError(f"division by zero: cell {fields['C']} is 0")
+        self.set(fields["D"], self.get(self.get(fields["B"])) // divisor)

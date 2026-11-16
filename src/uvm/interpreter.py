@@ -16,7 +16,9 @@ def parse_range(text: str) -> tuple[int, int]:
             f"{text!r} is not a range like 1000-1010"
         )
     first, last = int(start), int(end)
-    if first > last or last >= MEMORY_SIZE:
+    if first > last:
+        raise argparse.ArgumentTypeError(f"range {text!r} starts after it ends")
+    if last >= MEMORY_SIZE:
         raise argparse.ArgumentTypeError(
             f"range {text!r} must be within 0-{MEMORY_SIZE - 1}"
         )

@@ -33,10 +33,19 @@ def test_parse_range() -> None:
     assert parse_range("1000-1002") == (FIRST, LAST)
 
 
-@pytest.mark.parametrize("text", ["1000", "a-b", "-5", "10-5", "0-65536"])
-def test_bad_range(text: str) -> None:
-    """Неверный диапазон — ошибка argparse."""
-    with pytest.raises(argparse.ArgumentTypeError):
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("1000", "not a range"),
+        ("a-b", "not a range"),
+        ("-5", "not a range"),
+        ("10-5", "starts after it ends"),
+        ("0-65536", "must be within 0-65535"),
+    ],
+)
+def test_bad_range(text: str, message: str) -> None:
+    """Неверный диапазон — ошибка argparse с объяснением."""
+    with pytest.raises(argparse.ArgumentTypeError, match=message):
         parse_range(text)
 
 
